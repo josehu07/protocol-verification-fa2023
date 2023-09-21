@@ -53,8 +53,8 @@ lemma AbsLargerForAll()
 lemma AnotherForall()
 {
   // "Two wrongs don't make a right, but ..."
-  // FIXME: fill in here (solution: 1 line)
-   assert forall dir :: TurnLeft(TurnLeft(TurnLeft(dir))) == TurnRight(TurnRight(dir));
+  // DONE: fill in here (solution: 1 line)
+  assert forall dir :: TurnLeft(TurnLeft(TurnLeft(dir))) == TurnRight(dir);
   // END EDIT
 }
 
@@ -78,9 +78,9 @@ lemma ForallConditionalSyntax()
 lemma ForallConditionalExercise()
   ensures (forall x: int | x < 5 && P(x) :: Q(x)) <==>
           // write an equivalent forall without using the | syntax
-          // FIXME: fill in here (solution: 1 line)
-           (forall x: int :: true)
-          // END EDIT
+          // DONE: fill in here (solution: 1 line)
+          (forall x: int :: x< 5 && P(x) ==> Q(x))
+  // END EDIT
 {}
 
 // Here's there-exists, the "dual" of forall.
@@ -91,9 +91,9 @@ lemma TryThatCheeseOnASandwich()
   // a "witness".
   // To proceed, comment out this assertion for now and read on for how to solve it.
   // (If the '?' syntax is surprising, go (re-)read DirectionsLibrary.dfy.)
-  // FIXME: fill in here (solution: 2 lines)
-   assert (forall o1:Order | o1.Appetizer? ::
-             exists o2:Order :: o2.Sandwich? && o1.cheese == o2.cheese);
+  // DONE: fill in here (solution: 2 lines)
+  // assert (forall o1:Order | o1.Appetizer? ::
+  //           exists o2:Order :: o2.Sandwich? && o1.cheese == o2.cheese);
   // END EDIT
 }
 
@@ -115,9 +115,9 @@ lemma CheeseTakeTwo()
     // But how? What's missing is that Dafny needs a "witness" to the
     // there-exists. We need to show an expression that satisfies the
     // body of the exists. Try uncommenting these lines:
-    // FIXME: fill in here (solution: 2 lines)
-    // var o3 := Sandwich(Ham, o1.cheese);
-    // assert o3.Sandwich? && o1.cheese == o3.cheese;
+    // DONE: fill in here (solution: 2 lines)
+    var o3 := Sandwich(Ham, o1.cheese);
+    assert o3.Sandwich? && o1.cheese == o3.cheese;
     // END EDIT
     // Simply *mentioning* an Order that satisfies the predicate
     // on o2 above is enough for Dafny to see the proof; once we mention

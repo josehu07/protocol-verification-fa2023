@@ -5,8 +5,8 @@ lemma IntegerOrdering()
   // An assertion is a **static** check of a boolean expression -- a mathematical truth.
   // This boolean expression is about (mathematical) literal integers.
   // See the red squiggle on the incorrect statement? Replace it with something true.
-  // FIXME: fill in here (solution: 1 line)
-   assert 5 < 3;
+  // DONE: fill in here (solution: 1 line)
+  assert 3 < 5;
   // END EDIT
 }
 
@@ -14,8 +14,8 @@ lemma BooleanLogic()
 {
   // This boolean expression is about a boolean implication.
   // Fix the error on the following line.
-  // FIXME: fill in here (solution: 1 line)
-   assert true ==> false;
+  // DONE: fill in here (solution: 1 line)
+  assert true ==> true;
   // END EDIT
 }
 
@@ -42,8 +42,8 @@ lemma DoubleIsLikePlus()
 {
   assert Double(6) == 6 + 6;
   {
-    // FIXME: fill in here (solution: 1 line)
-     assert Double(-2) == 4;
+    // DONE: fill in here (solution: 1 line)
+    assert Double(-2) == -4;
     // END EDIT
   }
 }
@@ -52,8 +52,8 @@ lemma DoubleIsLikePlus()
 // *any* value, not just a particular literal.
 lemma foo4(val:int)
 {
-  // FIXME: fill in here (solution: 1 line)
-   assert Double(val) == val + val + val;
+  // DONE: fill in here (solution: 1 line)
+  assert Double(val) == val + val;
   // END EDIT
 }
 
@@ -81,7 +81,8 @@ lemma TheseTwoPredicatesAreEquivalent(x:int, y:int)
 // Add a 'requires' precondition to make this lemma verify.
 // Keep it as simple as possible (e.g. avoid named predicates).
 lemma FourTimesIsPrettyBig(x:int)
-  // FIXME: fill in here (solution: 1 line)
+  // DONE: fill in here (solution: 1 line)
+  requires x >= 0
   // END EDIT
 {
   assert AtLeastTwiceAsBigPredicate(Double(Double(x)), x);

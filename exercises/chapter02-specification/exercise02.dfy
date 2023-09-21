@@ -4,9 +4,10 @@
 */
 ghost predicate IsPrimeSpec(candidate:nat)
 {
-  // FIXME: fill in here (solution: 3 lines)
-   false // Replace me
-  // END EDIT
+  // DONE: fill in here (solution: 3 lines)
+  && candidate > 1
+  && forall n | 1 < n < candidate :: candidate % n != 0
+                                     // END EDIT
 }
 
 // illustrate IsPrimeSpec on a few examples (note that the verifier is able to
@@ -21,8 +22,10 @@ lemma ConstantObligations()
   ensures IsPrimeSpec(7)
   ensures !IsPrimeSpec(9)
 {
-  // FIXME: fill in here (solution: 3 lines)
-  // Add assertions here to prove the composite numbers have divisors.
+  // DONE: fill in here (solution: 3 lines)
+  assert 4 % 2 == 0;
+  assert 6 % 2 == 0;
+  assert 9 % 3 == 0;
   // END EDIT
 }
 
@@ -30,7 +33,8 @@ lemma CompositeIsntPrime(p: nat)
   requires 1 < p
   ensures !IsPrimeSpec(p*66)
 {
-  // FIXME: fill in here (solution: 1 line)
+  // DONE: fill in here (solution: 1 line)
+  assert p*66 % 66 == 0;
   // END EDIT
 }
 
@@ -49,10 +53,11 @@ function
   HasDivisorBelow(n:nat, limit:nat): bool
   requires limit >= 1
 {
-  // FIXME: fill in here (solution: 3 lines)
-   if limit == 1 then false else
-   false // Replace with an appropriate definition
-  // END EDIT
+  // DONE: fill in here (solution: 3 lines)
+  if limit == 1 then false else
+  if n % limit == 0 then true
+  else HasDivisorBelow(n, limit-1)
+       // END EDIT
 }
 
 function IsPrime(n: nat): bool {
@@ -71,23 +76,30 @@ function IsPrime(n: nat): bool {
 // this case (and is needed in more complex examples).
 lemma {:induction false} HasDivisorBelow_ok(n: nat, limit: nat)
   requires 1 <= limit
-  // FIXME: fill in here (solution: 3 lines)
-   ensures true
+  // DONE: fill in here (solution: 3 lines)
+  decreases limit
+  ensures HasDivisorBelow(n, limit) <==>
+          exists d | 1 < d <= limit :: n % d == 0
   // END EDIT
 {
-  // FIXME: fill in here (solution: 5 lines)
+  // DONE: fill in here (solution: 5 lines)
+  if limit > 1 {
+    HasDivisorBelow_ok(n, limit-1);
+    assert HasDivisorBelow(n, limit) == if n % limit == 0 then true
+                                        else HasDivisorBelow(n, limit-1);
+  }
   // END EDIT
 }
 
 lemma IsPrime_ok(n: nat)
   ensures IsPrime(n) == IsPrimeSpec(n)
 {
-  // FIXME: fill in here (solution: 4 lines)
-   // This proof should work if your postcondition for HasDivisorBelow_ok is
-   // correct, but you can change it if needed.
-   if n <= 2 {
-     return;
-   }
+  // DONE: fill in here (solution: 4 lines)
+  // This proof should work if your postcondition for HasDivisorBelow_ok is
+  // correct, but you can change it if needed.
+  if n <= 2 {
+    return;
+  }
   HasDivisorBelow_ok(n, n-1);
   // END EDIT
 }

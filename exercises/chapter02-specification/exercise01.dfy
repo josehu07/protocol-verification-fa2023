@@ -20,8 +20,8 @@ method ExplainEvenNumbers(x:int) returns (half_x:int)
   ensures half_x*2 == x
 {
   // return half_x by assigning it.
-  // FIXME: fill in here (solution: 1 line)
-   half_x := 1;
+  // DONE: fill in here (solution: 1 line)
+  half_x := x/2;
   // END EDIT
 }
 
@@ -49,8 +49,8 @@ lemma EvenDefinitionsAreEquivalent(x:int)
 // previous two, except for the base cases).
 function fibo(n:nat) : nat
 {
-  // FIXME: fill in here (solution: 3 lines)
-        0
+  // DONE: fill in here (solution: 3 lines)
+  if n < 2 then n else fibo(n-2) + fibo(n-1)
   // END EDIT
 }
 
@@ -96,9 +96,9 @@ method Larger(x: int) returns (y: int)
 // This method has a precondition that isn't required for correctness.
 
 method LargerNarrowPrecondition(x: int) returns (y: int)
-  // FIXME: fill in here (solution: 0 lines)
-  ensures y > x
+  // DONE: fill in here (solution: 0 lines)
   // END EDIT
+  ensures y > x
 {
   y := x + 1;
 }
@@ -123,13 +123,25 @@ method BinarySearch(haystack:seq<int>, needle:int) returns (index:nat)
   // Translate the above English specification to a postcondition (you
   // can use multiple ensures clauses). Remember that haystack[i] is the ith
   // element of the haystack and |haystack| is its length.
-  // FIXME: fill in here (solution: 3 lines)
-  // Add ensures clauses here
+  // DONE: fill in here (solution: 3 lines)
+  ensures index <= |haystack|
+  ensures index == |haystack| ==> |haystack| == 0 || haystack[|haystack|-1] < needle
+  ensures index < |haystack| ==> (index == 0 && needle <= haystack[0]) || (index > 0 && haystack[index-1] < needle <= haystack[index])
   // END EDIT
 
 {
-  // FIXME: fill in here (solution: 11 lines)
-   return 0;  // Replace me with an implementation.
+  // DONE: fill in here (solution: 11 lines)
+  if |haystack| == 0 {
+    return 0;
+  }
+  var im := |haystack| / 2;
+  if haystack[im] < needle {
+    var ih := BinarySearch(haystack[im+1..], needle);
+    return im + 1 + ih;
+  } else {
+    var il := BinarySearch(haystack[..im], needle);
+    return il;
+  }
   // END EDIT
 }
 
