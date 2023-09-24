@@ -125,8 +125,8 @@ method BinarySearch(haystack:seq<int>, needle:int) returns (index:nat)
   // element of the haystack and |haystack| is its length.
   // DONE: fill in here (solution: 3 lines)
   ensures index <= |haystack|
-  ensures index == |haystack| ==> |haystack| == 0 || haystack[|haystack|-1] < needle
-  ensures index < |haystack| ==> (index == 0 && needle <= haystack[0]) || (index > 0 && haystack[index-1] < needle <= haystack[index])
+  ensures forall i:nat | i < index :: haystack[i] < needle
+  ensures forall i:nat | index <= i < |haystack| :: needle <= haystack[i]
   // END EDIT
 
 {
