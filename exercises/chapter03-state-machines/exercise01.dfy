@@ -7,22 +7,25 @@
 datatype Variables = Variables(capacity: int, numCokes:int)
 
 ghost predicate Init(v:Variables) {
-  // FIXME: fill in here (solution: 2 lines)
-      true // Replace me
-  // END EDIT
+  // DONE: fill in here (solution: 2 lines)
+  && v.capacity == 7
+  && v.numCokes == 0
+     // END EDIT
 }
 
 ghost predicate Purchase(v:Variables, v':Variables) {
-  // FIXME: fill in here (solution: 2 lines)
-      true // Replace me
-  // END EDIT
+  // DONE: fill in here (solution: 2 lines)
+  && v.numCokes > 0
+  && v' == Variables(v.capacity, v.numCokes-1)
+     // END EDIT
 }
 
 ghost predicate Restock(v:Variables, v':Variables, numRestock:int)
 {
-  // FIXME: fill in here (solution: 3 lines)
-      true // Replace me
-  // END EDIT
+  // DONE: fill in here (solution: 3 lines)
+  && 0 < numRestock <= (v.capacity - v.numCokes)
+  && v' == Variables(v.capacity, v.numCokes + numRestock)
+     // END EDIT
 }
 
 // Jay-Normal-Form: pack all the nondeterminism into a single object
