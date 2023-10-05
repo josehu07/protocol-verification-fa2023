@@ -39,7 +39,7 @@ ghost predicate Init(v:Variables) {
   && v.server.Unlocked?
   && |v.clients| == v.clientCount
   && forall i | 0 <= i < |v.clients| :: v.clients[i].Released?
-     // END
+                                        // END
 }
 // SOLUTION
 ghost predicate Acquire(v:Variables, v':Variables, id:int) {
@@ -106,7 +106,7 @@ ghost predicate Safety(v:Variables) {
     && v.clients[i].Acquired?
     && v.clients[j].Acquired?
     :: i == j
-  // END
+       // END
 }
 
 

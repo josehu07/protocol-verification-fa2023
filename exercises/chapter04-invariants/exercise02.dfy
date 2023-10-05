@@ -9,11 +9,40 @@
 // this name:
 include "ch03exercise03.dfy"
 
-// FIXME: fill in here (solution: 11 lines)
- ghost predicate Inv(v:Variables) {
-   true // probably not strong enough :)
- }
+// DONE: fill in here (solution: 11 lines)
+ghost predicate Inv(v:Variables) {
+  && v.WellFormed()
+  && (v.server.Unlocked? ==> forall c | v.ValidIdx(c) :: v.clients[c].Released?)
+  && (v.server.Client? ==> && v.ValidIdx(v.server.id)
+                           && v.clients[v.server.id].Acquired?
+                           && forall c | v.ValidIdx(c) && c != v.server.id
+                                :: v.clients[c].Released?)
+}
 // END EDIT
+
+// lemma InitHolds(v:Variables)
+//   requires Init(v)
+//   ensures Inv(v)
+// {}
+
+// lemma InductiveOnAcquire(v:Variables, v':Variables, id:int)
+//   requires Inv(v)
+//   requires v.ValidIdx(id)
+//   requires NextStep(v, v', AcquireStep(id))
+//   ensures Inv(v')
+// {}
+
+// lemma InductiveOnRelease(v:Variables, v':Variables, id:int)
+//   requires Inv(v)
+//   requires v.ValidIdx(id)
+//   requires NextStep(v, v', ReleaseStep(id))
+//   ensures Inv(v')
+// {}
+
+// lemma ImpliesSafety(v:Variables)
+//   requires Inv(v)
+//   ensures Safety(v)
+// {}
 
 // Here's your obligation. Probably easiest to break this up into three
 // lemmas, each P==>Q becomes requires P ensures Q.
@@ -22,6 +51,8 @@ lemma SafetyTheorem(v:Variables, v':Variables)
   ensures Inv(v) && Next(v, v') ==> Inv(v')
   ensures Inv(v) ==> Safety(v)
 {
-  // FIXME: fill in here (solution: 10 lines)
+  // DONE: fill in here (solution: 10 lines)
+  // Comment: It seems that with the above Inv, Dafny is able to prove
+  //          this lemma by itself?
   // END EDIT
 }
