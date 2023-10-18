@@ -16,26 +16,50 @@ module TwoPCInvariantProof {
     requires v.WF()
   {
     // DONE: fill in here (solution: 5 lines)
-    && (Decide(Abort) in v.network.sentMsgs ==> exists p | ValidParticipantId(v, p) :: Vote(p, No) in v.network.sentMsgs)
-    && (Decide(Commit) in v.network.sentMsgs ==> forall p | ValidParticipantId(v, p) :: Vote(p, Yes) in v.network.sentMsgs)
+    && (forall p | ValidParticipantId(v, p) ::
+          ParticipantVars(v, p).decision == Some(Commit) ==> Decide(Commit) in v.network.sentMsgs)
+    && (CoordinatorVars(v).decision == Some(Abort)) == (Decide(Abort) in v.network.sentMsgs)
+    && (CoordinatorVars(v).decision == Some(Commit)) == (Decide(Commit) in v.network.sentMsgs)
        // END EDIT
   }
 
   // We use this block of code to define additional invariants. We recommend you
   // define predicates for the individual parts of your invariant, to make
   // debugging easier.
-  // FIXME: fill in here (solution: 20 lines)
+  // DONE: fill in here (solution: 20 lines)
+  ghost predicate DecisionMsgsReflectVotes(v: Variables)
+    requires v.WF()
+  {
+    && (Decide(Abort) in v.network.sentMsgs ==> exists p:nat | ValidParticipantId(v, p) :: CoordinatorVars(v).votes[p] == Some(No))
+    && (Decide(Commit) in v.network.sentMsgs ==> forall p:nat | ValidParticipantId(v, p) :: CoordinatorVars(v).votes[p] == Some(Yes))
+  }
+
+  ghost predicate VotesMadeByVoteMsgs(v: Variables)
+    requires v.WF()
+  {
+    forall p:nat, vote:Vote | ValidParticipantId(v, p)::
+      CoordinatorVars(v).votes[p] == Some(vote) ==> Vote(p, vote) in v.network.sentMsgs
+  }
+
+  ghost predicate VoteMsgsAgreeWithPreferences(v: Variables)
+    requires v.WF()
+  {
+    forall p:nat, vote:Vote | ValidParticipantId(v, p) ::
+      Vote(p, vote) in v.network.sentMsgs ==> ParticipantVars(v, p).c.preference == vote
+  }
   // END EDIT
 
 
   ghost predicate Inv(v: Variables)
   {
     && v.WF()
-       // FIXME: fill in here (solution: 2 lines)
+       // DONE: fill in here (solution: 2 lines)
        // We give you the blueprint for one invariant to get you started...
     && DecisionMsgsAgreeWithDecision(v)
        // ...but you'll need more.
-    && true
+    && DecisionMsgsReflectVotes(v)
+    && VotesMadeByVoteMsgs(v)
+    && VoteMsgsAgreeWithPreferences(v)
     && Safety(v)
   }
 
@@ -43,23 +67,12 @@ module TwoPCInvariantProof {
     requires Init(v)
     ensures Inv(v)
   {
-    // FIXME: fill in here (solution: 3 lines)
+    // DONE: fill in here (solution: 3 lines)
     assert DecisionMsgsAgreeWithDecision(v);
+    assert DecisionMsgsReflectVotes(v);
+    assert VotesMadeByVoteMsgs(v);
+    assert VoteMsgsAgreeWithPreferences(v);
     // END EDIT
-  }
-
-  lemma DecisionMsgsAgreeWithDecisionInductive(v: Variables, v': Variables)
-    requires v.WF()
-    requires DecisionMsgsAgreeWithDecision(v)
-    requires Next(v, v')
-    ensures DecisionMsgsAgreeWithDecision(v')
-  {
-    if Decide(Abort) in v.network.sentMsgs {
-      var p :| ValidParticipantId(v, p) && Vote(p, No) in v.network.sentMsgs;
-      assert Vote(p, No) in v'.network.sentMsgs;
-    } else if Decide(Commit) in v.network.sentMsgs {
-      assert forall p | ValidParticipantId(v', p) :: Vote(p, Yes) in v'.network.sentMsgs;
-    }
   }
 
   lemma InvInductive(v: Variables, v': Variables)
@@ -68,8 +81,94 @@ module TwoPCInvariantProof {
     ensures Inv(v')
   {
     //(not all of the below but much of it)
-    // FIXME: fill in here (solution: 59 lines)
-    DecisionMsgsAgreeWithDecisionInductive(v, v');
+    // DONE: fill in here (solution: 59 lines)
+    var step :| NextStep(v, v', step);
+    if step.hostId == |v.hosts|-1 {
+      // coordinator step
+      var cstep :| CoordinatorHost.NextStep(CoordinatorVars(v), CoordinatorVars(v'), cstep, step.msgOps);
+      match cstep {
+        case RequestVotesStep => {
+          assert CoordinatorVars(v).decision.None?;
+          assert CoordinatorVars(v').decision.None?;
+          forall p | ValidParticipantId(v, p)
+            ensures ParticipantVars(v, p).decision == ParticipantVars(v', p).decision
+          {}
+          assert DecisionMsgsAgreeWithDecision(v');
+          assert DecisionMsgsReflectVotes(v');
+          assert VotesMadeByVoteMsgs(v');
+          assert VoteMsgsAgreeWithPreferences(v');
+          assert Inv(v');
+        }
+        case ReceiveVoteStep => {
+          assert CoordinatorVars(v).decision.None?;
+          assert CoordinatorVars(v').decision.None?;
+          forall p | ValidParticipantId(v, p)
+            ensures ParticipantVars(v, p).decision == ParticipantVars(v', p).decision
+          {}
+          assert DecisionMsgsAgreeWithDecision(v');
+          assert DecisionMsgsReflectVotes(v');
+          assert VotesMadeByVoteMsgs(v');
+          assert VoteMsgsAgreeWithPreferences(v');
+          assert Inv(v');
+        }
+        case MakeDecisionStep => {
+          assert CoordinatorVars(v).decision.None?;
+          assert CoordinatorVars(v').decision.Some?;
+          if CoordinatorVars(v').decision.value == Commit {
+            assert Decide(Commit) in v'.network.sentMsgs;
+          } else {
+            assert Decide(Abort) in v'.network.sentMsgs;
+          }
+          forall p | ValidParticipantId(v, p)
+            ensures ParticipantVars(v, p).decision == ParticipantVars(v', p).decision
+          {}
+          assert DecisionMsgsAgreeWithDecision(v');
+          assert DecisionMsgsReflectVotes(v');
+          assert VotesMadeByVoteMsgs(v');
+          assert VoteMsgsAgreeWithPreferences(v');
+          assert Inv(v');
+        }
+      }
+    } else {
+      // participant step
+      var pstep :| ParticipantHost.NextStep(ParticipantVars(v, step.hostId), ParticipantVars(v', step.hostId), pstep, step.msgOps);
+      match pstep {
+        case ReplyVoteStep => {
+          assert ParticipantVars(v, step.hostId).decision.None?;
+          if ParticipantVars(v', step.hostId).decision == Some(Abort) {
+            assert ParticipantVars(v', step.hostId).c.preference.No?;
+          } else {
+            assert ParticipantVars(v', step.hostId).decision.None?;
+          }
+          forall p | ValidParticipantId(v', p) && p != step.hostId
+            ensures ParticipantVars(v, p).decision == ParticipantVars(v', p).decision
+          {}
+          assert DecisionMsgsAgreeWithDecision(v');
+          assert DecisionMsgsReflectVotes(v');
+          assert VotesMadeByVoteMsgs(v');
+          assert VoteMsgsAgreeWithPreferences(v');
+          assert Inv(v');
+        }
+        case ReceiveDecisionStep => {
+          assert ParticipantVars(v, step.hostId).c.preference.Yes?;
+          assert ParticipantVars(v, step.hostId).decision.None?;
+          assert ParticipantVars(v', step.hostId).decision.Some?;
+          if ParticipantVars(v', step.hostId).decision.value == Commit {
+            assert Decide(Commit) in v'.network.sentMsgs;
+          } else {
+            assert Decide(Abort) in v'.network.sentMsgs;
+          }
+          forall p | ValidParticipantId(v', p) && p != step.hostId
+            ensures ParticipantVars(v, p).decision == ParticipantVars(v', p).decision
+          {}
+          assert DecisionMsgsAgreeWithDecision(v');
+          assert DecisionMsgsReflectVotes(v');
+          assert VotesMadeByVoteMsgs(v');
+          assert VoteMsgsAgreeWithPreferences(v');
+          assert Inv(v');
+        }
+      }
+    }
     // END EDIT
   }
 

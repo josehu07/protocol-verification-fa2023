@@ -222,6 +222,7 @@ module ParticipantHost {
     && msgOps.recv.value.Decide?
     && var decision := msgOps.recv.value.decision;
     && v.decision.None?
+    && v.c.preference.Yes?
     && v' == v.(decision := Some(decision))
     && msgOps.send.None?
   }
