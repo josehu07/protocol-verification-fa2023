@@ -44,7 +44,7 @@ module Obligations {
     v.hosts[hostid].participant
   }
 
-  // FIXME: fill in here (solution: 8 lines)
+  // DONE: fill in here (solution: 8 lines)
   // END EDIT
 
   // AC-1: All processes that reach a decision reach the same one.
@@ -52,9 +52,17 @@ module Obligations {
     requires v.WF()
   {
     // All hosts that reach a decision reach the same one
-    // FIXME: fill in here (solution: 4 lines)
-        true // Replace me
-    // END EDIT
+    // DONE: fill in here (solution: 4 lines)
+    && (forall p1, p2 | && ValidParticipantId(v, p1)
+                        && ValidParticipantId(v, p2)
+                        && ParticipantVars(v, p1).decision.Some?
+                        && ParticipantVars(v, p2).decision.Some?
+          :: ParticipantVars(v, p1).decision.value == ParticipantVars(v, p2).decision.value)
+    && (forall p | && ValidParticipantId(v, p)
+                   && CoordinatorVars(v).decision.Some?
+                   && ParticipantVars(v, p).decision.Some?
+          :: CoordinatorVars(v).decision.value == ParticipantVars(v, p).decision.value)
+       // END EDIT
   }
 
   // AC2 is sort of a history predicate; we're going to ignore it.
@@ -63,17 +71,22 @@ module Obligations {
   ghost predicate SafetyAC3(v: Variables)
     requires v.WF()
   {
-    // FIXME: fill in here (solution: 6 lines)
-     true // Replace me
-    // END EDIT
+    // DONE: fill in here (solution: 6 lines)
+    forall p | ValidParticipantId(v, p) ::
+      ParticipantVars(v, p).c.preference.No? ==>
+        && (CoordinatorVars(v).decision.Some? ==> CoordinatorVars(v).decision.value == Abort)
+        && (forall p | ValidParticipantId(v, p) && ParticipantVars(v, p).decision.Some? :: ParticipantVars(v, p).decision.value == Abort)
+      // END EDIT
   }
 
   // AC-4: If all processes prefer Yes, then the decision must be Commit.
   ghost predicate SafetyAC4(v: Variables)
     requires v.WF()
   {
-    // FIXME: fill in here (solution: 5 lines)
-     true // Replace me
+    // DONE: fill in here (solution: 5 lines)
+    (forall p | ValidParticipantId(v, p) :: ParticipantVars(v, p).c.preference.Yes?)
+    ==> && (CoordinatorVars(v).decision.Some? ==> CoordinatorVars(v).decision.value == Commit)
+        && (forall p | ValidParticipantId(v, p) && ParticipantVars(v, p).decision.Some? :: ParticipantVars(v, p).decision.value == Commit)
     // END EDIT
   }
 

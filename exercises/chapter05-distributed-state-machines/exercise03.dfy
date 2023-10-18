@@ -15,9 +15,10 @@ module TwoPCInvariantProof {
   ghost predicate DecisionMsgsAgreeWithDecision(v: Variables)
     requires v.WF()
   {
-    // FIXME: fill in here (solution: 5 lines)
-     true // Replace me
-    // END EDIT
+    // DONE: fill in here (solution: 5 lines)
+    && (Decide(Abort) in v.network.sentMsgs ==> exists p | ValidParticipantId(v, p) :: Vote(p, No) in v.network.sentMsgs)
+    && (Decide(Commit) in v.network.sentMsgs ==> forall p | ValidParticipantId(v, p) :: Vote(p, Yes) in v.network.sentMsgs)
+       // END EDIT
   }
 
   // We use this block of code to define additional invariants. We recommend you
@@ -31,10 +32,10 @@ module TwoPCInvariantProof {
   {
     && v.WF()
        // FIXME: fill in here (solution: 2 lines)
-       // END EDIT
        // We give you the blueprint for one invariant to get you started...
     && DecisionMsgsAgreeWithDecision(v)
        // ...but you'll need more.
+    && true
     && Safety(v)
   }
 
@@ -43,7 +44,22 @@ module TwoPCInvariantProof {
     ensures Inv(v)
   {
     // FIXME: fill in here (solution: 3 lines)
+    assert DecisionMsgsAgreeWithDecision(v);
     // END EDIT
+  }
+
+  lemma DecisionMsgsAgreeWithDecisionInductive(v: Variables, v': Variables)
+    requires v.WF()
+    requires DecisionMsgsAgreeWithDecision(v)
+    requires Next(v, v')
+    ensures DecisionMsgsAgreeWithDecision(v')
+  {
+    if Decide(Abort) in v.network.sentMsgs {
+      var p :| ValidParticipantId(v, p) && Vote(p, No) in v.network.sentMsgs;
+      assert Vote(p, No) in v'.network.sentMsgs;
+    } else if Decide(Commit) in v.network.sentMsgs {
+      assert forall p | ValidParticipantId(v', p) :: Vote(p, Yes) in v'.network.sentMsgs;
+    }
   }
 
   lemma InvInductive(v: Variables, v': Variables)
@@ -53,6 +69,7 @@ module TwoPCInvariantProof {
   {
     //(not all of the below but much of it)
     // FIXME: fill in here (solution: 59 lines)
+    DecisionMsgsAgreeWithDecisionInductive(v, v');
     // END EDIT
   }
 
