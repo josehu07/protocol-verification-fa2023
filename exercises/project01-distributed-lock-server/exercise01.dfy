@@ -40,16 +40,21 @@ module SafetySpec {
   // Variables indicates that it holds the lock.
   ghost predicate HostHoldsLock(v:DistributedSystem.Variables, idx: int) {
     && v.WF()
-       // FIXME: fill in here (solution: 4 lines)
-    && false
+       // DONE: fill in here (solution: 4 lines)
+    && v.ValidHostId(idx)
+    && v.hosts[idx].holdsLock
        // END EDIT
   }
 
   // No two hosts think they hold the lock simultaneously.
   ghost predicate Safety(v:DistributedSystem.Variables) {
-    // FIXME: fill in here (solution: 4 lines)
-    true // Replace this placeholder with an appropriate safety condition
-    // END EDIT
+    // DONE: fill in here (solution: 4 lines)
+    forall h1:HostId, h2:HostId | && v.ValidHostId(h1)
+                                  && v.ValidHostId(h2)
+                                  && HostHoldsLock(v, h1)
+                                  && HostHoldsLock(v, h2)
+      :: h1 == h2
+         // END EDIT
   }
 }
 
@@ -67,29 +72,99 @@ module Proof {
   ghost predicate InFlight(v:Variables, message:Host.Message) {
     && v.WF()
     && message in v.network.sentMsgs
-                  // FIXME: fill in here (solution: 2 lines)
-    && false // ...add something about epoch numbers
+                  // DONE: fill in here (solution: 2 lines)
+    && v.ValidHostId(message.dest)
+    && v.hosts[message.dest].epoch < message.epoch
        // END EDIT
   }
-  // FIXME: fill in here (solution: 29 lines)
-  // END EDIT
 
-  ghost predicate Inv(v:Variables) {
-    // FIXME: fill in here (solution: 13 lines)
-    false // Replace this placeholder with an invariant that's inductive and supports Safety.
-    // END EDIT
+  ghost predicate InFlightMsgHighestEpoch(v:Variables) {
+    forall m | m in v.network.sentMsgs && InFlight(v, m)
+      :: forall mm | mm in v.network.sentMsgs && mm != m
+           :: mm.epoch < m.epoch
   }
 
-  lemma InvInductive(v: Variables, v': Variables)
+  ghost predicate AtMostOneInFlightMsg(v:Variables) {
+    forall m1, m2 | && m1 in v.network.sentMsgs
+                    && m2 in v.network.sentMsgs
+                    && InFlight(v, m1)
+                    && InFlight(v, m2)
+      :: m1 == m2
+  }
+
+  ghost predicate NoInFlightMsgsWhenHeld(v:Variables) {
+    forall h | v.ValidHostId(h) && v.hosts[h].holdsLock
+      :: forall m | m in v.network.sentMsgs :: !InFlight(v, m)
+  }
+
+  ghost predicate NoLocksHeldWhenInFlight(v:Variables) {
+    forall m | m in v.network.sentMsgs && InFlight(v, m)
+      :: forall h | v.ValidHostId(h) :: !v.hosts[h].holdsLock
+  }
+
+  ghost predicate LockGrantedByLatestMsg(v:Variables) {
+    forall h | v.ValidHostId(h) && v.hosts[h].holdsLock
+      :: || (&& h == 0
+             && v.hosts[h].epoch == 1
+             && v.network.sentMsgs == {})
+         || (&& Host.Grant(h, v.hosts[h].epoch) in v.network.sentMsgs
+             && forall m | m in v.network.sentMsgs && m != Host.Grant(h, v.hosts[h].epoch)
+                  :: m.epoch < v.hosts[h].epoch)
+  }
+
+  ghost predicate Inv(v:Variables) {
+    // DONE: fill in here (solution: 13 lines)
+    && InFlightMsgHighestEpoch(v)
+    && AtMostOneInFlightMsg(v)
+    && NoInFlightMsgsWhenHeld(v)
+    && NoLocksHeldWhenInFlight(v)
+    && LockGrantedByLatestMsg(v)
+       // END EDIT
+  }
+
+  lemma InitImpliesInv(v:Variables)
+    requires Init(v)
+    ensures Inv(v)
+  {
+    assert Inv(v);
+  }
+
+  lemma InvInductive(v:Variables, v':Variables)
     requires Inv(v) && Next(v, v')
     ensures Inv(v')
   {
     // Develop any necessary proof here.
-    // FIXME: fill in here (solution: 17 lines)
+    // DONE: fill in here (solution: 17 lines)
     var step :| NextStep(v, v', step);
-    var id := step.id;
-    var hstep :| Host.NextStep(v.hosts[id], v'.hosts[id], step.msgOps, hstep);
+    var h := step.id;
+    var msgOps := step.msgOps;
+    var hstep :| Host.NextStep(v.hosts[h], v'.hosts[h], msgOps, hstep);
+    match hstep {
+      case DoGrantStep(recipient) => {
+        assert InFlightMsgHighestEpoch(v');
+        assert AtMostOneInFlightMsg(v');
+        assert NoInFlightMsgsWhenHeld(v');
+        assert NoLocksHeldWhenInFlight(v');
+        assert LockGrantedByLatestMsg(v');
+        assert Inv(v');
+      }
+      case DoAcceptStep => {
+        assert InFlightMsgHighestEpoch(v');
+        assert AtMostOneInFlightMsg(v');
+        assert NoInFlightMsgsWhenHeld(v');
+        assert NoLocksHeldWhenInFlight(v');
+        assert LockGrantedByLatestMsg(v');
+        assert Inv(v');
+      }
+    }
     // END EDIT
+  }
+
+  lemma InvImpliesSafety(v:Variables)
+    requires Inv(v)
+    ensures Safety(v)
+  {
+    assert Safety(v);
   }
 
   lemma SafetyProof(v:Variables, v':Variables)
@@ -98,7 +173,16 @@ module Proof {
     ensures Inv(v) ==> Safety(v)
   {
     // Develop any necessary proof here.
-    // FIXME: fill in here (solution: 3 lines)
+    // DONE: fill in here (solution: 3 lines)
+    if Init(v) {
+      InitImpliesInv(v);
+    }
+    if Inv(v) && Next(v, v') {
+      InvInductive(v, v');
+    }
+    if Inv(v) {
+      InvImpliesSafety(v);
+    }
     // END EDIT
   }
 }
