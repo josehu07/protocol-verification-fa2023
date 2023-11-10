@@ -61,6 +61,12 @@ module RefinementProof refines RefinementTheorem {
     Last(v.hosts).coordinator
   }
 
+  ghost function ParticipantVars(v: DistributedSystem.Variables, i: nat) : ParticipantHost.Variables
+    requires v.WF()
+  {
+    v.hosts[i].participant
+  }
+
   // Here's a handy function to save you some typing.
   ghost function ParticipantCount(v: DistributedSystem.Variables) : nat
     requires v.WF()
@@ -73,15 +79,21 @@ module RefinementProof refines RefinementTheorem {
   ghost function Preferences(v: DistributedSystem.Variables) : seq<Vote>
     requires v.WF()
   {
-    // FIXME: fill in here (solution: 1 line)
-    []   // Replace me
-    // END EDIT
+    // DONE: fill in here (solution: 1 line)
+    seq(ParticipantCount(v), i => ParticipantVars(v, i).c.preference)
+      // END EDIT
+  }
+
+  ghost function Decisions(v: DistributedSystem.Variables) : seq<Option<Decision>>
+    requires v.WF()
+  {
+    seq(ParticipantCount(v), i => ParticipantVars(v, i).decision)
   }
 
   ghost function VariablesAbstraction(v: DistributedSystem.Variables) : AtomicCommit.Variables
   {
     // FIXME: fill in here (solution: 3 lines)
-    AtomicCommit.Variables(None, [])   // Replace me
+    AtomicCommit.Variables(Preferences(v), Decisions(v))
     // END EDIT
   }
 

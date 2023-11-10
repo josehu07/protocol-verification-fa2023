@@ -32,9 +32,13 @@ module AtomicCommitProperties {
   ghost predicate SafetyAC1(v: Variables)
     requires v.WF()
   {
-    // FIXME: fill in here (solution: 4 lines)
-    false // Replace me
-    // END EDIT
+    // DONE: fill in here (solution: 4 lines)
+    forall p1:nat, p2:nat | && v.ValidParticipant(p1)
+                            && v.ValidParticipant(p2)
+                            && v.decisions[p1].Some?
+                            && v.decisions[p2].Some?
+      :: v.decisions[p1] == v.decisions[p2]
+         // END EDIT
   }
 
   // AC2 can't be stated about a single state; the "code reviewer"
@@ -44,16 +48,21 @@ module AtomicCommitProperties {
   ghost predicate SafetyAC3(v: Variables)
     requires v.WF()
   {
-    // FIXME: fill in here (solution: 6 lines)
-    false // Replace me
-    // END EDIT
+    // DONE: fill in here (solution: 6 lines)
+    forall p:nat | && v.ValidParticipant(p)
+                   && v.decisions[p].Some?
+                   && v.decisions[p].value == Commit
+      :: forall pp:nat | v.ValidParticipant(pp) :: v.preferences[pp].Yes?
+                                                   // END EDIT
   }
 
   ghost predicate SafetyAC4(v: Variables)
     requires v.WF()
   {
-    // FIXME: fill in here (solution: 4 lines)
-    false // Replace me
+    // DONE: fill in here (solution: 4 lines)
+    (forall p:nat | v.ValidParticipant(p) :: v.preferences[p].Yes?)
+    ==> forall pp:nat | v.ValidParticipant(pp) && v.decisions[pp].Some?
+        :: v.decisions[pp].value == Commit
     // END EDIT
   }
 
