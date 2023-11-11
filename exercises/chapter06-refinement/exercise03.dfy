@@ -61,8 +61,9 @@ module RefinementProof refines RefinementTheorem {
     Last(v.hosts).coordinator
   }
 
-  ghost function ParticipantVars(v: DistributedSystem.Variables, i: nat) : ParticipantHost.Variables
+  ghost function ParticipantVars(v: DistributedSystem.Variables, i: HostId) : ParticipantHost.Variables
     requires v.WF()
+    requires i < |v.hosts| - 1
   {
     v.hosts[i].participant
   }
@@ -80,19 +81,27 @@ module RefinementProof refines RefinementTheorem {
     requires v.WF()
   {
     // DONE: fill in here (solution: 1 line)
-    seq(ParticipantCount(v), i => ParticipantVars(v, i).c.preference)
-      // END EDIT
+    seq(|v.hosts| - 1,
+    i => if 0 <= i < |v.hosts| - 1
+      then ParticipantVars(v, i).c.preference
+      else Yes // anything
+        )
+        // END EDIT
   }
 
   ghost function Decisions(v: DistributedSystem.Variables) : seq<Option<Decision>>
     requires v.WF()
   {
-    seq(ParticipantCount(v), i => ParticipantVars(v, i).decision)
+    seq(|v.hosts| - 1,
+    i => if 0 <= i < |v.hosts| - 1
+      then ParticipantVars(v, i).decision
+      else None // anything
+        )
   }
 
   ghost function VariablesAbstraction(v: DistributedSystem.Variables) : AtomicCommit.Variables
   {
-    // FIXME: fill in here (solution: 3 lines)
+    // DONE: fill in here (solution: 3 lines)
     AtomicCommit.Variables(Preferences(v), Decisions(v))
     // END EDIT
   }
@@ -103,8 +112,8 @@ module RefinementProof refines RefinementTheorem {
     // Be certain to fully-qualify the invariant name (mention its module
     // explicitly) to avoid inadvertently referring to the shadowing definition
     // RefinementTheorem.Inv.
-    // FIXME: fill in here (solution: 1 line)
-    false  // Replace me
+    // DONE: fill in here (solution: 1 line)
+    TwoPCInvariantProof.Inv(v)
     // END EDIT
   }
 
@@ -125,7 +134,8 @@ module RefinementProof refines RefinementTheorem {
   {
     // Advice: appeal to the existing proof to get Inv(v')!
     assert Inv(v') by {
-      // FIXME: fill in here (solution: 1 line)
+      // DONE: fill in here (solution: 1 line)
+      InvInductive(v, v', event);
       // END EDIT
     }
 
@@ -136,6 +146,7 @@ module RefinementProof refines RefinementTheorem {
     // assert the right AtomicCommit.NextStep() predicate. Mostly, Dafny needs
     // those asserts because they're witnesses to the `exists` in AtomicCommit.Next().
     // FIXME: fill in here (solution: 51 lines)
+
     // END EDIT
   }
 }
