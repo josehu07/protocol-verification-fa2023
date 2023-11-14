@@ -145,42 +145,46 @@ module RefinementProof refines RefinementTheorem {
     // which thing happened in the DistributedSystem, split the cases, and
     // assert the right AtomicCommit.NextStep() predicate. Mostly, Dafny needs
     // those asserts because they're witnesses to the `exists` in AtomicCommit.Next().
-    // FIXME: fill in here (solution: 51 lines)
+    // DONE: fill in here (solution: 51 lines)
     var systemStep :| DistributedSystem.NextStep(v, v', event, systemStep);
     var hostId := systemStep.hostId;
     var msgOps := systemStep.msgOps;
     if hostId == |v.hosts| - 1 {
       // coordinator step
-      // Dafny seems to know AtomicCommit always has NoOpEvent here
+      return;
     } else {
       // participant step
-      assert 0 <= hostId < |v.hosts| - 1;
+      assert ValidParticipantId(v, hostId);
       var participantStep, event :| ParticipantHost.NextStep(ParticipantVars(v, hostId), ParticipantVars(v', hostId), participantStep, msgOps, event);
       match participantStep {
         case VoteStep => {
+          // participant hostId took Vote step
           if ParticipantVars(v, hostId).c.preference.Yes? {
             assert VariablesAbstraction(v) == VariablesAbstraction(v');
-          } else if ParticipantVars(v, hostId).decision.Some? {
-            assert DecisionMsg(Commit) !in v.network.sentMsgs;
-            assert ParticipantVars(v, hostId).decision == Some(Abort);
-            assert ParticipantVars(v', hostId).decision == Some(Abort);
-            assert VariablesAbstraction(v) == VariablesAbstraction(v');
           } else {
-            assert event.ParticipantLearnsEvent?;
-            assert event.idx == hostId;
-            assert ParticipantVars(v', hostId).decision == Some(Abort);
-            assert VariablesAbstraction(v).preferences[hostId].No?;
-            assert AtomicCommit.UltimateDecision(VariablesAbstraction(v).preferences).Abort?;
-            assert AtomicCommit.NextStep(VariablesAbstraction(v), VariablesAbstraction(v'), event, AtomicCommit.ParticipantLearnsStep);
+            if ParticipantVars(v, hostId).decision.Some? {
+              assert DecisionMsg(Commit) !in v.network.sentMsgs;
+              assert ParticipantVars(v, hostId).decision == Some(Abort);
+              assert ParticipantVars(v', hostId).decision == Some(Abort);
+              assert VariablesAbstraction(v) == VariablesAbstraction(v');
+            } else {
+              assert event.ParticipantLearnsEvent?;
+              assert event.idx == hostId;
+              assert ParticipantVars(v', hostId).decision == Some(Abort);
+              assert VariablesAbstraction(v).preferences[hostId].No?;
+              assert AtomicCommit.UltimateDecision(VariablesAbstraction(v).preferences).Abort?;
+              assert AtomicCommit.NextStep(VariablesAbstraction(v), VariablesAbstraction(v'), event, AtomicCommit.ParticipantLearnsStep);
+            }
           }
         }
         case LearnDecisionStep => {
+          // participant hostId took LearnDecision step
           assert msgOps.recv.Some?;
           assert msgOps.recv.value.DecisionMsg?;
           var msgDecision := msgOps.recv.value.decision;
           if ParticipantVars(v, hostId).decision.Some? {
             if ParticipantVars(v, hostId).decision.value.Commit? {
-              assert DecisionMsg(Abort) !in v.network.sentMsgs;
+              assert DecisionMsg(Commit) in v.network.sentMsgs;
               assert msgDecision.Commit?;
             } else if ParticipantVars(v, hostId).c.preference.No? {
               assert msgDecision.Abort?;
@@ -193,14 +197,17 @@ module RefinementProof refines RefinementTheorem {
             assert event.ParticipantLearnsEvent?;
             assert event.idx == hostId;
             if msgDecision.Commit? {
-              assert DecisionMsgsAgreeWithCoordinator(v);
-              assert forall p:nat | 0 <= p < |v.hosts| - 1 :: ParticipantVars(v, p).c.preference.Yes?;
+              assert CoordinatorVars(v).decision == Some(Commit);
+              assert CoordinatorDecisionReflectsPreferences(v);
+              assert forall p:HostId | ValidParticipantId(v, p) :: ParticipantVars(v, p).c.preference.Yes?;
+              assert forall p:HostId | ValidParticipantId(v, p) :: VariablesAbstraction(v).preferences[p].Yes?;
               assert AtomicCommit.UltimateDecision(VariablesAbstraction(v).preferences).Commit?;
             } else {
               assert CoordinatorVars(v).decision == Some(Abort);
-              assert 
-              var p :| VoteMsg(p, No) in v.network.sentMsgs;
-              assert ParticipantVars(v, p).c.preference.No?;
+              assert CoordinatorDecisionReflectsPreferences(v);
+              assert |v.hosts| > 1;
+              var p:HostId :| ValidParticipantId(v, p) && ParticipantVars(v, p).c.preference.No?;
+              assert VariablesAbstraction(v).preferences[p].No?;
               assert AtomicCommit.UltimateDecision(VariablesAbstraction(v).preferences).Abort?;
             }
             assert AtomicCommit.UltimateDecision(VariablesAbstraction(v).preferences) == msgDecision;
