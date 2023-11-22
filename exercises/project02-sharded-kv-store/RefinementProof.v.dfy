@@ -26,16 +26,20 @@ module RefinementProof refines RefinementObligation {
       case HostOwner(id) =>
         // What does it mean for host id to own a key (and assign it the value
         // val)?
-        // FIXME: fill in here (solution: 3 lines)
-        true
+        // DONE: fill in here (solution: 3 lines)
+        && v.ValidHost(id)
+        && k in v.hosts[id].m
+        && val == v.hosts[id].m[k]
       // END EDIT
       case MessageOwner(msg) =>
         // What does it mean for the network to own a key (and assign it the
         // value val)? This is a new concept relative to the atomic demo from
         // chapter06.
-        // FIXME: fill in here (solution: 3 lines)
-        true
-        // END EDIT
+        // DONE: fill in here (solution: 3 lines)
+        && msg in v.network.inFlightMessages
+        && k in msg.chunk
+        && val == msg.chunk[k]
+           // END EDIT
     }
   }
 
@@ -44,7 +48,11 @@ module RefinementProof refines RefinementObligation {
     && v.WF()
     && IsFull(av.table)
        // Use OwnerValue to connect v to av
-       // FIXME: fill in here (solution: 1 line)
+       // DONE: fill in here (solution: 1 line)
+    && (forall id:nat | v.ValidHost(id)
+          :: forall k:int | k in v.hosts[id].m :: OwnerValue(v, HostOwner(id), k, av.table[k]))
+    && (forall msg | msg in v.network.inFlightMessages
+          :: forall k:int | k in msg.chunk :: OwnerValue(v, MessageOwner(msg), k, av.table[k]))
        // END EDIT
   }
 
@@ -139,7 +147,7 @@ module RefinementProof refines RefinementObligation {
   ghost predicate Inv(v: Variables)
   {
     // FIXME: fill in here (solution: 3 lines)
-    true
+    false
     // END EDIT
   }
 

@@ -4,7 +4,7 @@
 
 module MessageType {
   datatype Message =
-      // FIXME: fill in here (solution: 1 line)
-    | FillInHere
+      // DONE: fill in here (solution: 1 line)
+    | MigrateMsg(chunk: imap<int, int>)
       // END EDIT
 }

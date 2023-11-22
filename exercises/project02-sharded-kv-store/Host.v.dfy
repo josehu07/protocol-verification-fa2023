@@ -43,26 +43,65 @@ module Host {
 
   ghost predicate Init(v: Variables) {
     // hint: look at IMapHelpers for some tools to write this
-    // FIXME: fill in here (solution: 2 lines)
-    && true
+    // DONE: fill in here (solution: 2 lines)
+    && if v.myId == 0 then v.m == ZeroMap() else v.m == EmptyMap()
     // END EDIT
   }
 
   datatype Step =
-      // FIXME: fill in here (solution: 4 lines)
-    | ProtocolStepsHere // Replace me
+      // DONE: fill in here (solution: 4 lines)
+    | ServeGetStep
+    | ServePutStep
+    | SendMigrateStep
+    | RecvMigrateStep
       // END EDIT
 
   // Write a predicate for each step here.
-  // FIXME: fill in here (solution: 53 lines)
+  // DONE: fill in here (solution: 53 lines)
+  ghost predicate ServeGet(v: Variables, v': Variables, msgOps: Network.MessageOps, event: Event) {
+    && msgOps.recv.None?
+    && event.GetEvent?
+    && event.key in v.m
+    && msgOps.send.None?
+    && v' == v
+    && event.value == v.m[event.key]
+  }
+
+  ghost predicate ServePut(v: Variables, v': Variables, msgOps: Network.MessageOps, event: Event) {
+    && msgOps.recv.None?
+    && event.PutEvent?
+    && event.key in v.m
+    && msgOps.send.None?
+    && v' == v.(m := v.m[event.key := event.value])
+  }
+
+  ghost predicate SendMigrate(v: Variables, v': Variables, msgOps: Network.MessageOps, event: Event) {
+    && msgOps.recv.None?
+    && event.NoOpEvent?
+    && msgOps.send.Some?
+    && var chunk := msgOps.send.value.chunk;
+    && chunk.Keys <= v.m.Keys
+    && v' == v.(m := MapRemove(v.m, chunk.Keys))
+  }
+
+  ghost predicate RecvMigrate(v: Variables, v': Variables, msgOps: Network.MessageOps, event: Event) {
+    && msgOps.recv.Some?
+    && var chunk := msgOps.recv.value.chunk;
+    && event.NoOpEvent?
+    && msgOps.send.None?
+    && v' == v.(m := IMapUnionPreferLeft(chunk, v.m))
+  }
   // END EDIT
 
   ghost predicate NextStep(v: Variables, v': Variables, msgOps: Network.MessageOps, event: Event, step: Step)
   {
     match step {
       // boilerplate that dispatches to each of your step's predicates
-      // FIXME: fill in here (solution: 4 lines)
-      case ProtocolStepsHere => true
+      // DONE: fill in here (solution: 4 lines)
+      case ServePutStep => ServePut(v, v', msgOps, event)
+      case ServeGetStep => ServeGet(v, v', msgOps, event)
+      case SendMigrateStep => SendMigrate(v, v', msgOps, event)
+      case RecvMigrateStep => RecvMigrate(v, v', msgOps, event)
       // END EDIT
     }
   }
