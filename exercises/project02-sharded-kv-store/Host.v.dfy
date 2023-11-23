@@ -81,6 +81,7 @@ module Host {
     && msgOps.send.Some?
     && var chunk := msgOps.send.value.chunk;
     && chunk.Keys <= v.m.Keys
+    && (forall k | k in chunk.Keys :: v.m[k] == chunk[k])
     && v' == v.(m := MapRemove(v.m, chunk.Keys))
   }
 

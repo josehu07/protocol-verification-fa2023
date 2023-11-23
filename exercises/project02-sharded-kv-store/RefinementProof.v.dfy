@@ -43,17 +43,40 @@ module RefinementProof refines RefinementObligation {
     }
   }
 
+  // Helper extraction function for one key's owner and value
+  ghost function GetKeyOwnerAndValue(v: Variables, k: int) : (MapOwner,int)
+    requires v.WF()
+  {
+    if exists id, val :: OwnerValue(v, HostOwner(id), k, val) then
+      var id, val :| OwnerValue(v, HostOwner(id), k, val);
+      (HostOwner(id), val)
+    else if exists msg, val :: OwnerValue(v, MessageOwner(msg), k, val) then
+      var msg, val :| OwnerValue(v, MessageOwner(msg), k, val);
+      (MessageOwner(msg), val)
+    else
+      (HostOwner(0), 0)
+  }
+
+  ghost function GetKeyOwner(v: Variables, k: int) : MapOwner
+    requires v.WF()
+  {
+    GetKeyOwnerAndValue(v, k).0
+  }
+
+  ghost function GetKeyValue(v: Variables, k: int) : int
+    requires v.WF()
+  {
+    GetKeyOwnerAndValue(v, k).1
+  }
+
   ghost predicate AbstractionRelation(v: Variables, av: AtomicKV.Variables)
   {
     && v.WF()
     && IsFull(av.table)
-       // Use OwnerValue to connect v to av
-       // DONE: fill in here (solution: 1 line)
-    && (forall id:nat | v.ValidHost(id)
-          :: forall k:int | k in v.hosts[id].m :: OwnerValue(v, HostOwner(id), k, av.table[k]))
-    && (forall msg | msg in v.network.inFlightMessages
-          :: forall k:int | k in msg.chunk :: OwnerValue(v, MessageOwner(msg), k, av.table[k]))
-       // END EDIT
+    // Use OwnerValue to connect v to av
+    // DONE: fill in here (solution: 1 line)
+    && forall k | IsKey(k) :: av.table[k] == GetKeyValue(v, k)
+    // END EDIT
   }
 
   /* Now we give you a library of some predicates to write your invariant. These
@@ -146,8 +169,10 @@ module RefinementProof refines RefinementObligation {
 
   ghost predicate Inv(v: Variables)
   {
-    // FIXME: fill in here (solution: 3 lines)
-    false
+    // DONE: fill in here (solution: 3 lines)
+    && v.WF()
+    && (forall k:int | IsKey(k) :: OwnersDistinct(v, k))
+    && (exists owners:Owners :: OwnerHasSomeValue(v, owners))
     // END EDIT
   }
 
@@ -159,14 +184,413 @@ module RefinementProof refines RefinementObligation {
     ensures Inv(v)
     ensures AtomicKV.Init(VariablesAbstraction(v))
   {
-    // FIXME: fill in here (solution: 12 lines)
+    // DONE: fill in here (solution: 12 lines)
+    var init_owners:Owners := imap k | IsKey(k) :: HostOwner(0);
+    // v meets owner distinct
+    forall k | IsKey(k)
+      ensures OwnersDistinct(v, k)
+    {
+      reveal OwnersDistinct();
+    }
+    // v meets owner has value
+    assert exists owners:Owners :: OwnerHasSomeValue(v, owners) by
+    {
+      forall k | IsKey(k)
+        ensures exists val :: OwnerValue(v, init_owners[k], k, val)
+      {
+        var val := v.hosts[0].m[k];
+        assert OwnerValue(v, init_owners[k], k, val);
+      }
+      reveal OwnerHasSomeValue();
+      assert OwnerHasSomeValue(v, init_owners);
+    }
+    // spec init holds
+    var av := AtomicKV.Variables(ZeroMap());
+    assert AbstractionRelation(v, av) by
+    {
+      reveal OwnerHasSomeValue();
+      assert OwnerHasSomeValue(v, init_owners);
+      forall k | IsKey(k)
+        ensures OwnerValue(v, init_owners[k], k, av.table[k])
+      {}
+    }
+    assert OwnerHasSomeValue(v, init_owners) by
+    {
+      reveal OwnerHasSomeValue();
+    }
+    UniqueAbstraction(v, av, init_owners);
+    assert AtomicKV.Init(VariablesAbstraction(v));
     // END EDIT
   }
 
-  // FIXME: fill in here (solution: 204 lines)
+  // DONE: fill in here (solution: 204 lines)
   // Your proof goes here. We highly, highly recommend stating and proving a
   // refinement lemma for each step; see the chapter06 demo if you need help
   // structuring that.
+  lemma ServeGetPreservesAndRefines(id: HostId, v: Variables, v': Variables, msgOps: Network.MessageOps, event: Event)
+    requires Inv(v)
+    requires v.WF() && v'.WF() && |v.hosts| == |v'.hosts|
+    requires v.ValidHost(id) && v'.ValidHost(id)
+    requires Host.ServeGet(v.hosts[id], v'.hosts[id], msgOps, event)
+    requires OtherHostsUnchanged(v, v', id)
+    requires Network.Next(v.network, v'.network, msgOps)
+    ensures Inv(v')
+    ensures AtomicKV.Next(VariablesAbstraction(v), VariablesAbstraction(v'), event)
+  {
+    assert v' == v;
+    var owners:Owners :| OwnerHasSomeValue(v, owners);
+    // v' meets owner distinct
+    forall k | IsKey(k)
+      ensures OwnersDistinct(v', k)
+    {}
+    // v' meets owner has value
+    assert OwnerHasSomeValue(v', owners);
+    // spec next holds
+    assert event.GetEvent?;
+    assert VariablesAbstraction(v) == VariablesAbstraction(v');
+    assert exists av :: AbstractionRelation(v, av) by
+    {
+      var av := AtomicKV.Variables(imap k | IsKey(k) :: GetKeyValue(v, k));
+      assert AbstractionRelation(v, av);
+    }
+    var av :| AbstractionRelation(v, av);
+    assert av.table[event.key] == event.value by
+    {
+      assert av.table[event.key] == GetKeyValue(v, event.key);
+      assert GetKeyValue(v, event.key) == event.value by
+      {
+        reveal OwnersDistinct();
+        use_OwnerValue(v, owners, HostOwner(id), event.key, event.value);
+        assert OwnerValue(v, HostOwner(id), event.key, event.value);
+      }
+    }
+    UniqueAbstraction(v, av, owners);
+    assert AtomicKV.Get(VariablesAbstraction(v), VariablesAbstraction(v'), event.key, event.value);
+  }
+
+  lemma ServePutPreservesAndRefines(id: HostId, v: Variables, v': Variables, msgOps: Network.MessageOps, event: Event)
+    requires Inv(v)
+    requires v.WF() && v'.WF() && |v.hosts| == |v'.hosts|
+    requires v.ValidHost(id) && v'.ValidHost(id)
+    requires Host.ServePut(v.hosts[id], v'.hosts[id], msgOps, event)
+    requires OtherHostsUnchanged(v, v', id)
+    requires Network.Next(v.network, v'.network, msgOps)
+    ensures Inv(v')
+    ensures AtomicKV.Next(VariablesAbstraction(v), VariablesAbstraction(v'), event)
+  {
+    assert v' == v.(hosts := v.hosts[id := v.hosts[id].(m := v.hosts[id].m[event.key := event.value])]);
+    var owners:Owners :| OwnerHasSomeValue(v, owners);
+    // v' meets owner distinct
+    forall k | IsKey(k)
+      ensures OwnersDistinct(v', k)
+    {
+      reveal OwnersDistinct();
+      forall o1: MapOwner, o2: MapOwner, val1: int, val2: int |
+        (OwnerValue(v', o1, k, val1) && OwnerValue(v', o2, k, val2))
+      ensures o1 == o2 && val1 == val2
+      {
+        if k == event.key {
+          var oldval := use_OwnerHasSomeValue(v, owners, k);
+          assert OwnerValue(v, HostOwner(id), k, v.hosts[id].m[k]);
+          use_OwnerValue(v, owners, HostOwner(id), k, v.hosts[id].m[k]);
+          assert owners[k] == HostOwner(id);
+          assert v'.network.inFlightMessages == v.network.inFlightMessages;
+          forall m, val:int | m in v'.network.inFlightMessages
+            ensures !OwnerValue(v', MessageOwner(m), k, val)
+          {
+            assert !OwnerValue(v, MessageOwner(m), k, val);
+          }
+          forall h, val:int | v'.ValidHost(h) && h != id
+            ensures !OwnerValue(v', HostOwner(h), k, val)
+          {
+            assert !OwnerValue(v, HostOwner(h), k, val);
+          }
+          assert OwnerValue(v', HostOwner(id), k, v'.hosts[id].m[k]);
+        } else {
+          assert OwnerValue(v, o1, k, val1);
+          assert OwnerValue(v, o2, k, val2);
+        }
+        assert o1 == o2;
+      }
+    }
+    // v' meets owner has value
+    assert OwnerHasSomeValue(v', owners) by
+    {
+      reveal OwnerHasSomeValue();
+      forall k | IsKey(k)
+        ensures exists val :: OwnerValue(v', owners[k], k, val)
+      {
+        if k == event.key {
+          var oldval := use_OwnerHasSomeValue(v, owners, k);
+          assert OwnerValue(v, HostOwner(id), k, v.hosts[id].m[k]);
+          use_OwnerValue(v, owners, HostOwner(id), k, v.hosts[id].m[k]);
+          assert owners[k] == HostOwner(id);
+          assert OwnerValue(v', owners[k], k, event.value);
+        } else {
+          var oldval := use_OwnerHasSomeValue(v, owners, k);
+          assert OwnerValue(v', owners[k], k, oldval);
+        }
+      }
+    }
+    // spec next holds
+    assert event.PutEvent?;
+    assert exists av :: AbstractionRelation(v, av) by
+    {
+      var av := AtomicKV.Variables(imap k | IsKey(k) :: GetKeyValue(v, k));
+      assert AbstractionRelation(v, av);
+    }
+    var av :| AbstractionRelation(v, av);
+    UniqueAbstraction(v, av, owners);
+    var av' := av.(table := av.table[event.key := event.value]);
+    assert av' == VariablesAbstraction(v') by
+    {
+      forall k | IsKey(k)
+        ensures av'.table[k] == GetKeyValue(v', k)
+      {
+        reveal OwnersDistinct();
+        var val := use_OwnerHasSomeValue(v', owners, k);
+        assert OwnerValue(v', owners[k], k, val);
+        if k == event.key {
+          assert av'.table[k] == event.value;
+          use_OwnerValue(v', owners, HostOwner(id), k, v'.hosts[id].m[k]);
+          assert owners[k] == HostOwner(id);
+          assert val == event.value;
+          assert av'.table[k] == GetKeyValue(v', k);
+        } else {
+          assert av'.table[k] == av.table[k];
+          assert OwnerValue(v, owners[k], k, val);
+          assert av'.table[k] == GetKeyValue(v', k);
+        }
+      }
+      assert AbstractionRelation(v', av');
+      UniqueAbstraction(v', av', owners);
+    }
+    assert AtomicKV.Put(VariablesAbstraction(v), VariablesAbstraction(v'), event.key, event.value);
+  }
+
+  lemma SendMigratePreservesAndRefines(id: HostId, v: Variables, v': Variables, msgOps: Network.MessageOps, event: Event)
+    requires Inv(v)
+    requires v.WF() && v'.WF() && |v.hosts| == |v'.hosts|
+    requires v.ValidHost(id) && v'.ValidHost(id)
+    requires Host.SendMigrate(v.hosts[id], v'.hosts[id], msgOps, event)
+    requires OtherHostsUnchanged(v, v', id)
+    requires Network.Next(v.network, v'.network, msgOps)
+    ensures Inv(v')
+    ensures AtomicKV.Next(VariablesAbstraction(v), VariablesAbstraction(v'), event)
+  {
+    assert msgOps.send.Some?;
+    var msg := msgOps.send.value;
+    assert v'.hosts == v.hosts[id := v.hosts[id].(m := MapRemove(v.hosts[id].m, msg.chunk.Keys))];
+    assert v'.network.inFlightMessages == v.network.inFlightMessages + { msg };
+    var owners:Owners :| OwnerHasSomeValue(v, owners);
+    var new_owners := imap k | k in owners :: if k in msg.chunk then MessageOwner(msg) else owners[k];
+    // v' meets owner distinct
+    forall k | IsKey(k)
+      ensures OwnersDistinct(v', k)
+    {
+      reveal OwnersDistinct();
+      forall o1: MapOwner, o2: MapOwner, val1: int, val2: int |
+        (OwnerValue(v', o1, k, val1) && OwnerValue(v', o2, k, val2))
+      ensures o1 == o2 && val1 == val2
+      {
+        if k in msg.chunk {
+          var oldval := use_OwnerHasSomeValue(v, owners, k);
+          assert OwnerValue(v, HostOwner(id), k, v.hosts[id].m[k]);
+          use_OwnerValue(v, owners, HostOwner(id), k, v.hosts[id].m[k]);
+          assert owners[k] == HostOwner(id);
+          forall m, val:int | m in v'.network.inFlightMessages && m != msg
+            ensures !OwnerValue(v', MessageOwner(m), k, val)
+          {
+            assert !OwnerValue(v, MessageOwner(m), k, val);
+          }
+          forall h, val:int | v'.ValidHost(h)
+            ensures !OwnerValue(v', HostOwner(h), k, val)
+          {
+            if h != id {
+              assert !OwnerValue(v, HostOwner(h), k, val);
+            }
+          }
+          assert OwnerValue(v', MessageOwner(msg), k, msg.chunk[k]);
+        } else {
+          assert OwnerValue(v, o1, k, val1);
+          assert OwnerValue(v, o2, k, val2);
+        }
+        assert o1 == o2;
+      }
+    }
+    // v' meets owner has value
+    assert OwnerHasSomeValue(v', new_owners) by
+    {
+      reveal OwnerHasSomeValue();
+      forall k | IsKey(k)
+        ensures exists val :: OwnerValue(v', new_owners[k], k, val)
+      {
+        if k in msg.chunk {
+          var oldval := use_OwnerHasSomeValue(v, owners, k);
+          assert OwnerValue(v, HostOwner(id), k, v.hosts[id].m[k]);
+          use_OwnerValue(v, owners, HostOwner(id), k, v.hosts[id].m[k]);
+          assert owners[k] == HostOwner(id);
+          assert new_owners[k] == MessageOwner(msg);
+          assert v.hosts[id].m[k] == msg.chunk[k];
+          assert OwnerValue(v', new_owners[k], k, msg.chunk[k]);
+        } else {
+          var oldval := use_OwnerHasSomeValue(v, owners, k);
+          assert OwnerValue(v', owners[k], k, oldval);
+          assert owners[k] == new_owners[k];
+          assert OwnerValue(v', new_owners[k], k, oldval);
+        }
+      }
+    }
+    // spec next holds
+    assert event.NoOpEvent?;
+    assert exists av :: AbstractionRelation(v, av) by
+    {
+      var av := AtomicKV.Variables(imap k | IsKey(k) :: GetKeyValue(v, k));
+      assert AbstractionRelation(v, av);
+    }
+    var av :| AbstractionRelation(v, av);
+    UniqueAbstraction(v, av, owners);
+    assert av == VariablesAbstraction(v') by
+    {
+      forall k | IsKey(k)
+        ensures av.table[k] == GetKeyValue(v', k)
+      {
+        reveal OwnersDistinct();
+        var val := use_OwnerHasSomeValue(v, owners, k);
+        assert OwnerValue(v, owners[k], k, val);
+        var new_val := use_OwnerHasSomeValue(v', new_owners, k);
+        assert OwnerValue(v', new_owners[k], k, new_val);
+        if k in msg.chunk {
+          use_OwnerValue(v, owners, HostOwner(id), k, v.hosts[id].m[k]);
+          assert owners[k] == HostOwner(id);
+          assert av.table[k] == v.hosts[id].m[k];
+          use_OwnerValue(v', new_owners, MessageOwner(msg), k, msg.chunk[k]);
+          assert new_owners[k] == MessageOwner(msg);
+          assert new_val == msg.chunk[k];
+          assert msg.chunk[k] == v.hosts[id].m[k];
+          assert av.table[k] == GetKeyValue(v', k);
+        } else {
+          assert owners[k] == new_owners[k];
+          assert OwnerValue(v, owners[k], k, val);
+          assert av.table[k] == GetKeyValue(v', k);
+        }
+      }
+      assert AbstractionRelation(v', av);
+      UniqueAbstraction(v', av, new_owners);
+    }
+    assert AtomicKV.NoOp(VariablesAbstraction(v), VariablesAbstraction(v'));
+  }
+
+  lemma RecvMigratePreservesAndRefines(id: HostId, v: Variables, v': Variables, msgOps: Network.MessageOps, event: Event)
+    requires Inv(v)
+    requires v.WF() && v'.WF() && |v.hosts| == |v'.hosts|
+    requires v.ValidHost(id) && v'.ValidHost(id)
+    requires Host.RecvMigrate(v.hosts[id], v'.hosts[id], msgOps, event)
+    requires OtherHostsUnchanged(v, v', id)
+    requires Network.Next(v.network, v'.network, msgOps)
+    ensures Inv(v')
+    ensures AtomicKV.Next(VariablesAbstraction(v), VariablesAbstraction(v'), event)
+  {
+    assert msgOps.recv.Some?;
+    var msg := msgOps.recv.value;
+    assert v'.hosts == v.hosts[id := v.hosts[id].(m := IMapUnionPreferLeft(msg.chunk, v.hosts[id].m))];
+    assert v'.network.inFlightMessages == v.network.inFlightMessages - { msg };
+    var owners:Owners :| OwnerHasSomeValue(v, owners);
+    var new_owners := imap k | k in owners :: if k in msg.chunk then HostOwner(id) else owners[k];
+    // v' meets owner distinct
+    forall k | IsKey(k)
+      ensures OwnersDistinct(v', k)
+    {
+      reveal OwnersDistinct();
+      forall o1: MapOwner, o2: MapOwner, val1: int, val2: int |
+        (OwnerValue(v', o1, k, val1) && OwnerValue(v', o2, k, val2))
+      ensures o1 == o2 && val1 == val2
+      {
+        if k in msg.chunk {
+          var oldval := use_OwnerHasSomeValue(v, owners, k);
+          assert OwnerValue(v, MessageOwner(msg), k, msg.chunk[k]);
+          use_OwnerValue(v, owners, MessageOwner(msg), k, msg.chunk[k]);
+          assert owners[k] == MessageOwner(msg);
+          forall m, val:int | m in v'.network.inFlightMessages
+            ensures !OwnerValue(v', MessageOwner(m), k, val)
+          {
+            assert !OwnerValue(v, MessageOwner(m), k, val);
+          }
+          forall h, val:int | v'.ValidHost(h) && h != id
+            ensures !OwnerValue(v', HostOwner(h), k, val)
+          {
+            assert !OwnerValue(v, HostOwner(h), k, val);
+          }
+          assert OwnerValue(v', HostOwner(id), k, v'.hosts[id].m[k]);
+        } else {
+          assert OwnerValue(v, o1, k, val1);
+          assert OwnerValue(v, o2, k, val2);
+        }
+        assert o1 == o2;
+      }
+    }
+    // v' meets owner has value
+    assert OwnerHasSomeValue(v', new_owners) by
+    {
+      reveal OwnerHasSomeValue();
+      forall k | IsKey(k)
+        ensures exists val :: OwnerValue(v', new_owners[k], k, val)
+      {
+        if k in msg.chunk {
+          var oldval := use_OwnerHasSomeValue(v, owners, k);
+          assert OwnerValue(v, MessageOwner(msg), k, msg.chunk[k]);
+          use_OwnerValue(v, owners, MessageOwner(msg), k, msg.chunk[k]);
+          assert owners[k] == MessageOwner(msg);
+          assert new_owners[k] == HostOwner(id);
+          assert v'.hosts[id].m[k] == msg.chunk[k];
+          assert OwnerValue(v', new_owners[k], k, v'.hosts[id].m[k]);
+        } else {
+          var oldval := use_OwnerHasSomeValue(v, owners, k);
+          assert OwnerValue(v', owners[k], k, oldval);
+          assert owners[k] == new_owners[k];
+          assert OwnerValue(v', new_owners[k], k, oldval);
+        }
+      }
+    }
+    // spec next holds
+    assert event.NoOpEvent?;
+    assert exists av :: AbstractionRelation(v, av) by
+    {
+      var av := AtomicKV.Variables(imap k | IsKey(k) :: GetKeyValue(v, k));
+      assert AbstractionRelation(v, av);
+    }
+    var av :| AbstractionRelation(v, av);
+    UniqueAbstraction(v, av, owners);
+    assert av == VariablesAbstraction(v') by
+    {
+      forall k | IsKey(k)
+        ensures av.table[k] == GetKeyValue(v', k)
+      {
+        reveal OwnersDistinct();
+        var val := use_OwnerHasSomeValue(v, owners, k);
+        assert OwnerValue(v, owners[k], k, val);
+        var new_val := use_OwnerHasSomeValue(v', new_owners, k);
+        assert OwnerValue(v', new_owners[k], k, new_val);
+        if k in msg.chunk {
+          use_OwnerValue(v, owners, MessageOwner(msg), k, msg.chunk[k]);
+          assert owners[k] == MessageOwner(msg);
+          assert av.table[k] == msg.chunk[k];
+          use_OwnerValue(v', new_owners, HostOwner(id), k, v'.hosts[id].m[k]);
+          assert new_owners[k] == HostOwner(id);
+          assert new_val == v'.hosts[id].m[k];
+          assert msg.chunk[k] == v'.hosts[id].m[k];
+          assert av.table[k] == GetKeyValue(v', k);
+        } else {
+          assert owners[k] == new_owners[k];
+          assert OwnerValue(v, owners[k], k, val);
+          assert av.table[k] == GetKeyValue(v', k);
+        }
+      }
+      assert AbstractionRelation(v', av);
+      UniqueAbstraction(v', av, new_owners);
+    }
+    assert AtomicKV.NoOp(VariablesAbstraction(v), VariablesAbstraction(v'));
+  }
   // END EDIT
 
   lemma RefinementNext(v: Variables, v': Variables, event: Event)
@@ -184,7 +608,13 @@ module RefinementProof refines RefinementObligation {
     var step: Host.Step :| Host.NextStep(v.hosts[id], v'.hosts[id], msgOps, event, step);
     // All the solution dos here is match on the step and call the lemma for
     // refinement of that step.
-    // FIXME: fill in here (solution: 14 lines)
+    // DONE: fill in here (solution: 14 lines)
+    match step {
+      case ServeGetStep => ServeGetPreservesAndRefines(id, v, v', msgOps, event);
+      case ServePutStep => ServePutPreservesAndRefines(id, v, v', msgOps, event);
+      case SendMigrateStep => SendMigratePreservesAndRefines(id, v, v', msgOps, event);
+      case RecvMigrateStep => RecvMigratePreservesAndRefines(id, v, v', msgOps, event);
+    }
     // END EDIT
   }
 }
